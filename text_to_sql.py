@@ -3,6 +3,64 @@ import json
 import re
 import sqlite3
 
+# ==================== 业务边界定义 ====================
+# 业务相关关键词列表 - 只有包含这些关键词的问题才会被处理
+BUSINESS_KEYWORDS = [
+    # 业务场景
+    "漏斗", "流失", "转化", "曝光", "点击", "订单",
+    # 分析类型
+    "分析", "查询", "检查", "统计", "对比", "趋势", "排名",
+    # 指标关键词
+    "花费", "预算", "成本", "支出", "gmv", "成交额", "销售额", 
+    "roi", "投入产出", "投资回报", "点击率", "ctr", "转化率", "cvr",
+    # 渠道名称
+    "直通车", "引力魔方", "万相台", "渠道", "计划",
+    # 异常检测
+    "异常", "问题", "不对劲", "告警", "异常数据",
+    # 时间范围
+    "最近", "今天", "昨天", "本周", "上周", "本月", "上月", "天", "周", "月"
+]
+
+# 友好提示信息
+BUSINESS_PROMPT = """
+👋 您好！我是电商数据分析助手，专注于广告投放数据的分析和归因。
+
+**我可以帮您分析：**
+- 📈 漏斗流失分析（曝光→点击→订单）
+- 💰 ROI 投入产出分析
+- 🔍 异常数据检测
+- 📉 广告花费趋势
+- 🎯 点击率/转化率分析
+- 🏷️ GMV 销售额分析
+- 📦 订单数据分析
+
+**示例问题：**
+- 分析引力魔方最近 3 天的漏斗流失情况
+- 查询各渠道的 ROI 排名
+- 检查最近 3 天有没有异常数据
+
+**请提问与电商广告数据分析相关的问题，感谢您的使用！**
+"""
+
+def is_business_related(question: str) -> bool:
+    """
+    检查问题是否与业务相关
+    
+    Args:
+        question: 用户问题
+        
+    Returns:
+        True 如果问题包含业务关键词，False 否则
+    """
+    if not question or not isinstance(question, str):
+        return False
+    
+    question_lower = question.lower()
+    for keyword in BUSINESS_KEYWORDS:
+        if keyword.lower() in question_lower:
+            return True
+    return False
+
 # ==================== 业务意图定义 ====================
 INTENT_DEFINITIONS = {
     "funnel_analysis": {
@@ -335,6 +393,11 @@ def text_to_sql(user_question: str, api_key: str) -> str:
     
     print(f"\n=== 开始处理用户问题 ===")
     print(f"用户问：{user_question}")
+    
+    # 业务边界检查
+    if not is_business_related(user_question):
+        print("[警告] 用户问题与业务无关")
+        return "BUSINESS_BOUNDARY"  # 返回特殊标记表示业务边界
     
     # 第一阶段：意图识别
     intent_id = _detect_intent(user_question, api_key)
