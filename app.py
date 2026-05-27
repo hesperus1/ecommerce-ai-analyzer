@@ -356,6 +356,21 @@ if user_input and not st.session_state.processing:
         "content": user_input
     })
     
+    # 先检查业务边界
+    from text_to_sql import is_business_related, BUSINESS_PROMPT
+    if not is_business_related(user_input):
+        # 业务不相关，直接返回友好提示
+        assistant_msg = {
+            "role": "assistant",
+            "sql_status": "completed",
+            "data_status": "completed",
+            "analysis_status": "completed",
+            "analysis": BUSINESS_PROMPT
+        }
+        st.session_state.messages.append(assistant_msg)
+        st.session_state.processing = False
+        st.rerun()
+    
     assistant_msg = {
         "role": "assistant",
         "sql_status": "processing",
