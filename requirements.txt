@@ -1,0 +1,23 @@
+# 项目依赖清单
+# 电商数据智能分析平台 - AI 数据异动归因中台
+
+# 核心框架
+streamlit>=1.30.0
+
+# 数据处理
+pandas>=2.1.0
+numpy>=1.26.0
+
+# API 请求
+requests>=2.31.0
+
+# 数据格式转换
+pyarrow>=14.0.0
+
+# SQLite（Python 内置，无需额外安装）
+# sqlite3 - 内置模块
+
+# 部署说明：
+# 1. 安装依赖：pip install -r requirements.txt
+# 2. 创建 .streamlit/secrets.toml 文件并配置 API Key
+# 3. 运行：streamlit run app.py
