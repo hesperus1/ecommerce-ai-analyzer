@@ -1,6 +1,7 @@
 import streamlit as st
 import time
 import pandas as pd
+from intent_router import route_intent
 from text_to_sql import text_to_sql
 from data_analysis_agent import execute_sql_with_error_handling, ai_attribution_analysis
 
@@ -47,9 +48,7 @@ st.markdown("""
     
     /* 助手消息气泡 - 靠左对齐 */
     .assistant-message {
-        display: flex;
-        justify-content: flex-start;
-        margin-bottom: 12px;
+        display: block;
         padding-left: 10px;
     }
     
@@ -108,6 +107,29 @@ st.markdown("""
         border: 1px solid #e2e8f0;
     }
     
+    /* 简单卡片 - 用于无关闲聊和知识问答 */
+    .simple-card {
+        background-color: #f1f5f9;
+        color: #334155;
+        padding: 12px 18px;
+        border-radius: 18px;
+        border-bottom-left-radius: 4px;
+        max-width: 70%;
+        word-break: break-word;
+        font-size: 14px;
+    }
+    
+    /* 思考指示器 */
+    .thinking-indicator {
+        background-color: #eff6ff;
+        color: #1e40af;
+        padding: 10px 16px;
+        border-radius: 18px;
+        border-bottom-left-radius: 4px;
+        font-size: 14px;
+        display: inline-block;
+    }
+    
     /* 侧边栏样式 */
     .sidebar-section {
         margin-bottom: 20px;
@@ -128,6 +150,12 @@ st.markdown("""
         gap: 8px;
         margin-top: 12px;
         margin-left: 10px;
+    }
+    
+    .action-btn-simple {
+        display: flex;
+        gap: 8px;
+        margin-top: 4px;
     }
     
     .btn {
@@ -259,58 +287,98 @@ for idx, msg in enumerate(st.session_state.messages):
         st.markdown(f'<div class="user-bubble">{msg["content"]}</div>', unsafe_allow_html=True)
         st.markdown('</div>', unsafe_allow_html=True)
     else:
-        # 助手消息 - 包含步骤状态
-        st.markdown('<div class="assistant-message">', unsafe_allow_html=True)
+        # 获取意图分类
+        intent_category = msg.get("intent_category", "")
+        intent_route = msg.get("intent_route", "")
         
-        # SQL 步骤
-        sql_status = msg.get("sql_status", "")
-        st.markdown(f'<div class="step-box {sql_status}">', unsafe_allow_html=True)
-        st.markdown(f'<div class="step-title"> SQL{" 生成中..." if sql_status == "processing" else " 生成完成"}</div>', unsafe_allow_html=True)
-        if sql_status == "completed" and "sql" in msg:
-            with st.expander("查看 SQL 代码"):
-                st.code(msg["sql"], language="sql")
-        elif sql_status == "error":
-            st.error("SQL 生成失败")
-        st.markdown('</div>', unsafe_allow_html=True)
+        # ========== 分支 1: 无关闲聊 - 直接渲染文本，无任何多余容器 ==========
+        if intent_category == "IRRELEVANT":
+            st.markdown(f'<div class="simple-card">{msg.get("analysis", "")}</div>', unsafe_allow_html=True)
         
-        # 数据查询步骤
-        if sql_status in ["completed", "error"]:
-            data_status = msg.get("data_status", "")
-            st.markdown(f'<div class="step-box {data_status}">', unsafe_allow_html=True)
-            st.markdown(f'<div class="step-title">📊 数据{" 查询中..." if data_status == "processing" else " 查询完成"}</div>', unsafe_allow_html=True)
-            if data_status == "completed" and "data" in msg:
-                with st.expander("查看查询结果"):
-                    # 使用安全的方式显示数据
-                    try:
-                        df = pd.DataFrame(msg["data"]["data"], columns=msg["data"]["columns"])
-                        st.dataframe(df, use_container_width=True)
-                    except:
-                        st.write(msg["data"])
-            elif data_status == "error":
-                st.error("数据查询失败")
-            st.markdown('</div>', unsafe_allow_html=True)
+        # ========== 分支 2: 知识问答 - 直接渲染文本 ==========
+        elif intent_category == "KNOWLEDGE_QA":
+            knowledge_qa_status = msg.get("knowledge_qa_status", "")
+            
+            if knowledge_qa_status == "processing":
+                # 思考中状态
+                st.markdown('<div class="thinking-indicator">💡 正在思考解答...</div>', unsafe_allow_html=True)
+            elif knowledge_qa_status == "completed":
+                # 完成状态 - 直接渲染答案
+                st.markdown(f'<div class="simple-card">{msg.get("analysis", "")}</div>', unsafe_allow_html=True)
         
-        # 分析步骤
-        data_status = msg.get("data_status", "")
-        analysis_status = msg.get("analysis_status", "")  # 在条件块外定义
-        if data_status in ["completed", "error"]:
-            st.markdown(f'<div class="step-box {analysis_status}">', unsafe_allow_html=True)
-            st.markdown(f'<div class="step-title">🤖 AI{" 分析中..." if analysis_status == "processing" else " 分析完成"}</div>', unsafe_allow_html=True)
-            if analysis_status == "completed" and "analysis" in msg:
-                st.markdown('<div class="analysis-card">', unsafe_allow_html=True)
-                st.markdown('<div style="font-weight: 600; color: #1e293b; margin-bottom: 12px;">📋 分析报告</div>', unsafe_allow_html=True)
-                st.markdown(msg["analysis"], unsafe_allow_html=True)
+        # ========== 分支 3: 数据查询 - 使用结构化容器 ==========
+        elif intent_category == "DATA_QUERY" or intent_route == "processing":
+            st.markdown('<div class="assistant-message">', unsafe_allow_html=True)
+            
+            # 意图路由阶段
+            if intent_route == "processing":
+                st.markdown(f'<div class="step-box processing">', unsafe_allow_html=True)
+                st.markdown(f'<div class="step-title">🎯 正在识别意图...</div>', unsafe_allow_html=True)
                 st.markdown('</div>', unsafe_allow_html=True)
-            elif analysis_status == "error":
-                st.error("AI 分析失败")
+            
+            # 数据查询完整步骤
+            elif intent_category == "DATA_QUERY":
+                # SQL 步骤
+                sql_status = msg.get("sql_status", "")
+                if sql_status:
+                    st.markdown(f'<div class="step-box {sql_status}">', unsafe_allow_html=True)
+                    st.markdown(f'<div class="step-title"> SQL{" 生成中..." if sql_status == "processing" else " 生成完成"}</div>', unsafe_allow_html=True)
+                    if sql_status == "completed" and "sql" in msg:
+                        with st.expander("查看 SQL 代码"):
+                            st.code(msg["sql"], language="sql")
+                    elif sql_status == "error":
+                        st.error("SQL 生成失败")
+                    st.markdown('</div>', unsafe_allow_html=True)
+                
+                # 数据查询步骤
+                if sql_status in ["completed", "error"]:
+                    data_status = msg.get("data_status", "")
+                    st.markdown(f'<div class="step-box {data_status}">', unsafe_allow_html=True)
+                    st.markdown(f'<div class="step-title">📊 数据{" 查询中..." if data_status == "processing" else " 查询完成"}</div>', unsafe_allow_html=True)
+                    if data_status == "completed" and "data" in msg:
+                        with st.expander("查看查询结果"):
+                            try:
+                                df = pd.DataFrame(msg["data"]["data"], columns=msg["data"]["columns"])
+                                st.dataframe(df, use_container_width=True)
+                            except:
+                                st.write(msg["data"])
+                    elif data_status == "error":
+                        st.error("数据查询失败")
+                    st.markdown('</div>', unsafe_allow_html=True)
+                
+                # 分析步骤
+                data_status = msg.get("data_status", "")
+                analysis_status = msg.get("analysis_status", "")
+                if data_status in ["completed", "error"]:
+                    st.markdown(f'<div class="step-box {analysis_status}">', unsafe_allow_html=True)
+                    st.markdown(f'<div class="step-title">🤖 AI{" 分析中..." if analysis_status == "processing" else " 分析完成"}</div>', unsafe_allow_html=True)
+                    if analysis_status == "completed" and "analysis" in msg:
+                        # 使用 st.markdown 直接渲染 Markdown 内容，确保标题正确解析
+                        st.markdown("📋 **分析报告**")
+                        st.markdown(msg["analysis"])
+                    elif analysis_status == "error":
+                        st.error("AI 分析失败")
+                    st.markdown('</div>', unsafe_allow_html=True)
+            
+            # 关闭 assistant-message 容器
             st.markdown('</div>', unsafe_allow_html=True)
         
-        # 操作按钮（完成或失败后显示）
-        all_status = [sql_status, data_status, analysis_status]
-        is_finished = all(s in ["completed", "error", ""] for s in all_status) and any(s in ["completed", "error"] for s in all_status)
+        # ========== 操作按钮（根据分支使用不同样式） ==========
+        is_finished = False
+        
+        if intent_category == "IRRELEVANT":
+            is_finished = intent_route == "completed"
+        elif intent_category == "KNOWLEDGE_QA":
+            knowledge_qa_status = msg.get("knowledge_qa_status", "")
+            is_finished = knowledge_qa_status in ["completed", "error"]
+        elif intent_category == "DATA_QUERY":
+            analysis_status = msg.get("analysis_status", "")
+            is_finished = analysis_status in ["completed", "error"]
         
         if is_finished:
-            st.markdown('<div class="action-btn">', unsafe_allow_html=True)
+            # 根据意图分类选择不同的按钮容器样式
+            btn_container_class = "action-btn" if intent_category == "DATA_QUERY" else "action-btn-simple"
+            st.markdown(f'<div class="{btn_container_class}"></div>', unsafe_allow_html=True)
             col1, col2 = st.columns([1, 1])
             with col1:
                 if st.button(f"🔄 重试", key=f"retry_{idx}", use_container_width=True):
@@ -319,7 +387,9 @@ for idx, msg in enumerate(st.session_state.messages):
                     st.session_state.messages.pop(idx)
                     assistant_msg = {
                         "role": "assistant",
-                        "sql_status": "processing",
+                        "intent_route": "processing",
+                        "intent_category": "",
+                        "sql_status": "",
                         "data_status": "",
                         "analysis_status": ""
                     }
@@ -330,9 +400,6 @@ for idx, msg in enumerate(st.session_state.messages):
                     st.session_state.messages.pop(idx)
                     st.session_state.messages.pop(idx-1)
                     st.rerun()
-            st.markdown('</div>', unsafe_allow_html=True)
-        
-        st.markdown('</div>', unsafe_allow_html=True)
 
 st.markdown('</div>', unsafe_allow_html=True)
 
@@ -356,24 +423,11 @@ if user_input and not st.session_state.processing:
         "content": user_input
     })
     
-    # 先检查业务边界
-    from text_to_sql import is_business_related, BUSINESS_PROMPT
-    if not is_business_related(user_input):
-        # 业务不相关，直接返回友好提示
-        assistant_msg = {
-            "role": "assistant",
-            "sql_status": "completed",
-            "data_status": "completed",
-            "analysis_status": "completed",
-            "analysis": BUSINESS_PROMPT
-        }
-        st.session_state.messages.append(assistant_msg)
-        st.session_state.processing = False
-        st.rerun()
-    
     assistant_msg = {
         "role": "assistant",
-        "sql_status": "processing",
+        "intent_route": "processing",  # 意图路由状态
+        "intent_category": "",  # 分类结果：IRRELEVANT/KNOWLEDGE_QA/DATA_QUERY
+        "sql_status": "",
         "data_status": "",
         "analysis_status": ""
     }
@@ -395,7 +449,56 @@ if st.session_state.processing and len(st.session_state.messages) > 0:
         st.session_state.stop_requested = False
         st.rerun()
     
-    if last_msg.get("role") == "assistant" and last_msg.get("sql_status") == "processing":
+    # ========== 意图路由阶段 ==========
+    if last_msg.get("role") == "assistant" and last_msg.get("intent_route") == "processing":
+        # 步骤 1: 意图路由 - 调用大模型进行精确分类
+        intent_category = route_intent(current_question, st.session_state.api_key)
+        last_msg["intent_route"] = "completed"
+        last_msg["intent_category"] = intent_category
+        
+        # 根据分类结果执行不同分支
+        if intent_category == "IRRELEVANT":
+            # 分支 1: 无关闲聊 - 直接拦截，输出友好提示
+            last_msg["analysis"] = """
+**亲，我是您的电商投流数据洞察助手。**  
+
+我目前只擅长解答直通车、引力魔方等广告渠道的数据异动和归因问题哦。  
+
+如果有关于 **ROI 下降、花费飙升、转化异常、漏斗流失** 等问题，请随时考考我！
+
+**示例问题：**
+- 分析引力魔方最近3天的漏斗流失情况
+- 查询各渠道的ROI排名
+- 检查最近3天有没有异常数据
+- 哪个计划的点击率最低？
+"""
+            st.session_state.processing = False
+            st.rerun()
+        
+        elif intent_category == "KNOWLEDGE_QA":
+            # 分支 2: 业务概念与知识问答 - 直接调用大模型解答，跳过SQL和查库
+            last_msg["knowledge_qa_status"] = "processing"
+            st.rerun()
+        
+        elif intent_category == "DATA_QUERY":
+            # 分支 3: 数据查询与诊断 - 进入核心工作流
+            last_msg["sql_status"] = "processing"
+            st.rerun()
+        
+        st.rerun()
+    
+    # ========== 知识问答分支 ==========
+    elif last_msg.get("role") == "assistant" and last_msg.get("knowledge_qa_status") == "processing":
+        # 直接调用大模型回答知识问题
+        from data_analysis_agent import ai_knowledge_qa
+        answer = ai_knowledge_qa(current_question, st.session_state.api_key)
+        last_msg["knowledge_qa_status"] = "completed"
+        last_msg["analysis"] = answer
+        st.session_state.processing = False
+        st.rerun()
+    
+    # ========== 数据查询分支 ==========
+    elif last_msg.get("role") == "assistant" and last_msg.get("sql_status") == "processing":
         # 步骤 1: 生成 SQL
         sql = text_to_sql(current_question, st.session_state.api_key)
         
@@ -424,7 +527,7 @@ if st.session_state.processing and len(st.session_state.messages) > 0:
         st.rerun()
     
     elif last_msg.get("analysis_status") == "processing":
-        # 步骤 3: AI 分析
+        # 步骤 3: AI 归因分析
         analysis = ai_attribution_analysis(current_question, last_msg["sql"], last_msg["data"], st.session_state.api_key)
         last_msg["analysis"] = analysis
         last_msg["analysis_status"] = "completed"
