@@ -260,6 +260,87 @@ def _clean_output(text: str) -> str:
     
     return text
 
+def ai_knowledge_qa(user_question: str, api_key: str) -> str:
+    """
+    业务概念与知识问答 - 直接调用大模型解答电商投流相关的概念和知识问题
+    
+    Args:
+        user_question: 用户的知识问题
+        api_key: 硅基流动 API Key
+    
+    Returns:
+        知识问答答案（Markdown 格式）
+    """
+    system_prompt = """
+你是一位资深的电商广告投放专家，专注于淘宝/天猫平台的直通车、引力魔方、万相台等广告渠道。
+
+请用清晰、专业但易懂的语言回答用户的问题。
+
+【回答要求】
+1. 使用 Markdown 格式，结构清晰
+2. 对于指标定义类问题，给出明确的计算公式（如果适用）
+3. 对于运营策略类问题，提供可操作的建议
+4. 确保所有输出都是中文，避免使用英文缩写（首次出现时注明缩写）
+
+【禁止输出】
+- 不要输出类似 ";'5" 或 ";'3" 这样的乱码
+- 不要在句子末尾添加无意义的数字
+- 不要出现"投敌"等错别字，正确应为"投放"
+- 不要输出不完整或断裂的句子
+
+【示例】
+用户问：点击率代表什么？
+回答：点击率（CTR）是指广告被点击的次数占展现次数的比例。
+计算公式：CTR = 点击量 / 展现量 × 100%
+它反映了广告素材和标题对用户的吸引力，是衡量广告效果的重要指标之一。
+"""
+    
+    # API 请求配置
+    url = "https://api.siliconflow.cn/v1/chat/completions"
+    headers = {
+        "Content-Type": "application/json",
+        "Authorization": f"Bearer {api_key}"
+    }
+    
+    # 构建请求体
+    payload = {
+        "model": "deepseek-ai/DeepSeek-R1-0528-Qwen3-8B",
+        "messages": [
+            {
+                "role": "system",
+                "content": system_prompt
+            },
+            {
+                "role": "user",
+                "content": user_question
+            }
+        ],
+        "temperature": 0.1,
+        "max_tokens": 1000
+    }
+    
+    try:
+        response = requests.post(url, headers=headers, data=json.dumps(payload))
+        response.raise_for_status()
+        result = response.json()
+        answer = result["choices"][0]["message"]["content"].strip()
+        
+        # 清理输出
+        answer = _clean_output(answer)
+        
+        # 格式化答案
+        formatted_answer = f"""
+**📚 知识解答**
+
+{answer}
+"""
+        return formatted_answer
+        
+    except Exception as e:
+        error_msg = f"知识问答失败: {str(e)}"
+        print(f"[ERROR] {error_msg}")
+        return f"**📚 知识解答**\n\n抱歉，暂时无法回答这个问题。请稍后重试。"
+
 if __name__ == "__main__":
     """测试用例"""
     API_KEY = "your_api_key_here"  # 请替换为实际的 API Key
