@@ -3,64 +3,6 @@ import json
 import re
 import sqlite3
 
-# ==================== 业务边界定义 ====================
-# 业务相关关键词列表 - 只有包含这些关键词的问题才会被处理
-BUSINESS_KEYWORDS = [
-    # 业务场景
-    "漏斗", "流失", "转化", "曝光", "点击", "订单",
-    # 分析类型
-    "分析", "查询", "检查", "统计", "对比", "趋势", "排名",
-    # 指标关键词
-    "花费", "预算", "成本", "支出", "gmv", "成交额", "销售额", 
-    "roi", "投入产出", "投资回报", "点击率", "ctr", "转化率", "cvr",
-    # 渠道名称
-    "直通车", "引力魔方", "万相台", "渠道", "计划",
-    # 异常检测
-    "异常", "问题", "不对劲", "告警", "异常数据",
-    # 时间范围
-    "最近", "今天", "昨天", "本周", "上周", "本月", "上月", "天", "周", "月"
-]
-
-# 友好提示信息
-BUSINESS_PROMPT = """
-👋 您好！我是电商数据分析助手，专注于广告投放数据的分析和归因。
-
-**我可以帮您分析：**
-- 📈 漏斗流失分析（曝光→点击→订单）
-- 💰 ROI 投入产出分析
-- 🔍 异常数据检测
-- 📉 广告花费趋势
-- 🎯 点击率/转化率分析
-- 🏷️ GMV 销售额分析
-- 📦 订单数据分析
-
-**示例问题：**
-- 分析引力魔方最近 3 天的漏斗流失情况
-- 查询各渠道的 ROI 排名
-- 检查最近 3 天有没有异常数据
-
-**请提问与电商广告数据分析相关的问题，感谢您的使用！**
-"""
-
-def is_business_related(question: str) -> bool:
-    """
-    检查问题是否与业务相关
-    
-    Args:
-        question: 用户问题
-        
-    Returns:
-        True 如果问题包含业务关键词，False 否则
-    """
-    if not question or not isinstance(question, str):
-        return False
-    
-    question_lower = question.lower()
-    for keyword in BUSINESS_KEYWORDS:
-        if keyword.lower() in question_lower:
-            return True
-    return False
-
 # ==================== 业务意图定义 ====================
 INTENT_DEFINITIONS = {
     "funnel_analysis": {
@@ -116,14 +58,16 @@ INTENT_DEFINITIONS = {
 }
 
 # 默认时间范围映射
+# 使用子查询获取数据库中的最大日期，确保时间范围基于数据实际日期计算
+# 使用 SQLite 的 date() 函数进行日期计算，语法：date(date_value, '+/- N days')
 TIME_MAPPING = {
-    '最近3天': "date >= DATE('now', '-3 days')",
-    '最近7天': "date >= DATE('now', '-7 days')",
-    '最近一周': "date >= DATE('now', '-7 days')",
-    '昨天': "date = DATE('now', '-1 days')",
-    '今天': "date = DATE('now')",
-    '本周': "strftime('%W', date) = strftime('%W', 'now')",
-    '上周': "strftime('%W', date) = strftime('%W', 'now', '-7 days')",
+    '最近 3 天': "date >= date((SELECT MAX(date) FROM ad_campaign_daily_reports), '-3 days')",
+    '最近 7 天': "date >= date((SELECT MAX(date) FROM ad_campaign_daily_reports), '-7 days')",
+    '最近一周': "date >= date((SELECT MAX(date) FROM ad_campaign_daily_reports), '-7 days')",
+    '昨天': "date = date((SELECT MAX(date) FROM ad_campaign_daily_reports), '-1 days')",
+    '今天': "date = (SELECT MAX(date) FROM ad_campaign_daily_reports)",
+    '本周': "date >= date((SELECT MAX(date) FROM ad_campaign_daily_reports), '-7 days')",
+    '上周': "date BETWEEN date((SELECT MAX(date) FROM ad_campaign_daily_reports), '-14 days') AND date((SELECT MAX(date) FROM ad_campaign_daily_reports), '-8 days')",
 }
 
 # 根据意图生成SQL的模板
@@ -283,6 +227,20 @@ def _detect_intent(user_question: str, api_key: str) -> str:
         print(f"[意图识别] 模型调用失败: {str(e)}")
         return ""
 
+# 无关问题关键词列表
+IRRELEVANT_KEYWORDS = [
+    # 问候语
+    '你好', '您好', '嗨', '哈喽', 'hello', 'hi', '早上好', '下午好', '晚上好',
+    # 闲聊
+    '吃饭了吗', '天气', '天气怎么样', '今天天气', '明天天气', '历史', '故事',
+    '新闻', '娱乐', '电影', '音乐', '游戏', '旅游', '美食',
+    # 创作类
+    '写诗', '写文章', '写故事', '编段子', '作对联', '写代码', '编程',
+    # 其他无关话题
+    '笑话', '谜语', '脑筋急转弯', '星座', '运势', '股票', '基金',
+    '足球', '篮球', '体育', '运动', '健康', '医疗', '教育', '学习'
+]
+
 def _rule_based_intent_detection(user_question: str) -> str:
     """
     基于规则的意图识别（快速路径）
@@ -291,12 +249,18 @@ def _rule_based_intent_detection(user_question: str) -> str:
         user_question: 用户问题
     
     Returns:
-        意图ID或空字符串
+        意图ID、'[IRRELEVANT_QUERY]' 或空字符串
     """
     if not user_question:
         return ""
     
     question = user_question.lower()
+    
+    # 先判断是否为无关问题
+    for keyword in IRRELEVANT_KEYWORDS:
+        if keyword.lower() in question:
+            print(f"[意图识别] 检测到无关问题关键词: {keyword}")
+            return '[IRRELEVANT_QUERY]'
     
     # 按优先级匹配意图
     intent_order = ['funnel_analysis', 'abnormal_detection', 'roi_analysis', 
@@ -361,7 +325,10 @@ def _generate_sql_from_intent(intent_id: str, params: dict) -> str:
     if params['channel']:
         channel_condition = f"campaign_type = '{params['channel']}'"
     
-    time_condition = TIME_MAPPING.get(params['time_range'], TIME_MAPPING['最近7天'])
+    # 安全地获取时间条件，使用安全的默认值
+    default_time_key = '最近 3 天'
+    time_key = params['time_range'] if params['time_range'] in TIME_MAPPING else default_time_key
+    time_condition = TIME_MAPPING[time_key]
     
     # 生成SQL
     sql = template.format(
@@ -375,16 +342,17 @@ def text_to_sql(user_question: str, api_key: str) -> str:
     """
     将用户的自然语言问题转化为 SQLite 查询语句
     
-    两阶段处理：
-    1. 意图识别：分析用户问题，确定业务意图
-    2. SQL 生成：根据意图和参数生成 SQL
+    三阶段处理：
+    1. 边界检测：判断是否为业务无关问题
+    2. 意图识别：分析用户问题，确定业务意图
+    3. SQL 生成：根据意图和参数生成 SQL
     
     Args:
         user_question: 用户的自然语言问题
         api_key: 硅基流动 API Key（由调用方传入）
     
     Returns:
-        生成的 SQL 查询语句
+        生成的 SQL 查询语句，或 '[IRRELEVANT_QUERY]'（无关问题）
     """
     # 检查 API Key 是否有效
     if not api_key:
@@ -394,28 +362,62 @@ def text_to_sql(user_question: str, api_key: str) -> str:
     print(f"\n=== 开始处理用户问题 ===")
     print(f"用户问：{user_question}")
     
-    # 业务边界检查
-    if not is_business_related(user_question):
-        print("[警告] 用户问题与业务无关")
-        return "BUSINESS_BOUNDARY"  # 返回特殊标记表示业务边界
+    # 第一阶段：边界检测 - 判断是否为无关问题
+    if _is_irrelevant_question(user_question):
+        print("[边界拦截] 检测到无关问题，返回拦截标识")
+        return '[IRRELEVANT_QUERY]'
     
-    # 第一阶段：意图识别
+    # 第二阶段：意图识别
     intent_id = _detect_intent(user_question, api_key)
     
-    # 如果意图识别失败，使用默认查询
+    # 如果意图识别失败，检查是否是因为问题太宽泛
     if not intent_id:
-        print("[警告] 意图识别失败，使用默认查询")
-        return _get_default_sql()
+        print("[边界拦截] 无法识别业务意图，返回拦截标识")
+        return '[IRRELEVANT_QUERY]'
     
-    # 第二阶段：提取参数
+    # 如果是无关意图，直接返回
+    if intent_id == '[IRRELEVANT_QUERY]':
+        print("[边界拦截] 规则匹配到无关问题")
+        return '[IRRELEVANT_QUERY]'
+    
+    # 第三阶段：提取参数
     params = _extract_parameters(user_question)
     print(f"[参数提取] 渠道: {params['channel']}, 时间范围: {params['time_range']}")
     
-    # 第三阶段：生成SQL
+    # 第四阶段：生成SQL
     sql = _generate_sql_from_intent(intent_id, params)
     print(f"[SQL生成] {sql[:100]}...")
     
     return sql
+
+def _is_irrelevant_question(user_question: str) -> bool:
+    """
+    判断用户问题是否与电商广告投放数据无关
+    
+    Args:
+        user_question: 用户问题
+    
+    Returns:
+        True 如果是无关问题，False 否则
+    """
+    if not user_question:
+        return True
+    
+    question = user_question.lower().strip()
+    
+    # 检查是否包含无关关键词
+    for keyword in IRRELEVANT_KEYWORDS:
+        if keyword.lower() in question:
+            return True
+    
+    # 检查是否为纯问候或闲聊
+    greetings = ['你好', '您好', '嗨', '哈喽', 'hello', 'hi', '早上好', '下午好', '晚上好', '再见']
+    if any(g in question for g in greetings):
+        # 如果只是简单问候，判定为无关
+        if len(question) <= 10:
+            return True
+    
+    return False
 
 def _get_default_sql() -> str:
     """返回默认的安全查询"""
