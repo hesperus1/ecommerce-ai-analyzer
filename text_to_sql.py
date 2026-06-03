@@ -200,7 +200,7 @@ def _detect_intent(user_question: str, api_key: str, model_name: str = "Qwen/Qwe
     }
     
     payload = {
-        "model": model_name,  # 使用配置的模型名称
+        "model": model_name,
         "messages": [
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": user_question}
