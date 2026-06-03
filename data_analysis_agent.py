@@ -179,7 +179,7 @@ def ai_attribution_analysis(user_question: str, sql: str, raw_data: dict, api_ke
     
     # 构建请求体
     payload = {
-        "model": "deepseek-ai/DeepSeek-R1-0528-Qwen3-8B",
+        "model": "Qwen/Qwen3.5-9B",
         "messages": [
             {
                 "role": "system",
