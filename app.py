@@ -320,6 +320,8 @@ for idx, msg in enumerate(st.session_state.messages):
                 st.markdown(f'<div class="step-box processing">', unsafe_allow_html=True)
                 st.markdown(f'<div class="step-title">🎯 正在识别意图...</div>', unsafe_allow_html=True)
                 st.markdown('</div>', unsafe_allow_html=True)
+                st.markdown('</div>', unsafe_allow_html=True) 
+                continue
             
             # 数据查询完整步骤
             elif intent_category == "DATA_QUERY":
