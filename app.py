@@ -18,8 +18,7 @@ st.markdown("""
 <style>
     /* 主内容区 - 修复侧边栏遮挡 */
     .main-content {
-        padding: 20px;
-        padding-bottom: 100px;
+        padding: 0px;
         max-width: 900px;
         margin: 0 auto;
     }
@@ -195,8 +194,8 @@ st.markdown("""
     
     /* 修复 Streamlit 默认样式 */
     .block-container {
-        padding-top: 2rem;
-        padding-bottom: 2rem;
+        padding-top: 1rem;
+        padding-bottom: 0.5rem;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -320,8 +319,8 @@ for idx, msg in enumerate(st.session_state.messages):
                 st.markdown(f'<div class="step-box processing">', unsafe_allow_html=True)
                 st.markdown(f'<div class="step-title">🎯 正在识别意图...</div>', unsafe_allow_html=True)
                 st.markdown('</div>', unsafe_allow_html=True)
-                st.markdown('</div>', unsafe_allow_html=True) 
-                continue
+                st.markdown('</div>', unsafe_allow_html=True)  # 关闭 assistant-message
+                continue  # 跳过后续渲染和按钮，避免空白
             
             # 数据查询完整步骤
             elif intent_category == "DATA_QUERY":
