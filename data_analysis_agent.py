@@ -176,9 +176,7 @@ def ai_attribution_analysis(user_question: str, sql: str, raw_data: dict, api_ke
         "Content-Type": "application/json",
         "Authorization": f"Bearer {api_key}"
     }
-    
-    # 构建请求体
-    # 使用配置的模型名称（默认使用免费的 Qwen3.5-9B）
+
     payload = {
         "model": model_name,
         "messages": [
@@ -302,9 +300,7 @@ def ai_knowledge_qa(user_question: str, api_key: str, model_name: str = "Qwen/Qw
         "Content-Type": "application/json",
         "Authorization": f"Bearer {api_key}"
     }
-    
-    # 构建请求体
-    # 使用配置的模型名称（默认使用免费的 Qwen3.5-9B）
+
     payload = {
         "model": model_name,
         "messages": [
