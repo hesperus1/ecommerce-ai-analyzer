@@ -61,7 +61,7 @@ def execute_sql_with_error_handling(sql: str, db_path: str = 'ecommerce_ads.db')
         print(f"[ERROR] {error_msg}")
         return (False, error_msg)
 
-def ai_attribution_analysis(user_question: str, sql: str, raw_data: dict, api_key: str) -> str:
+def ai_attribution_analysis(user_question: str, sql: str, raw_data: dict, api_key: str, model_name: str = "Qwen/Qwen3.5-9B") -> str:
     """
     调用大模型进行 AI 归因分析
     
@@ -178,8 +178,9 @@ def ai_attribution_analysis(user_question: str, sql: str, raw_data: dict, api_ke
     }
     
     # 构建请求体
+    # 使用配置的模型名称（默认使用免费的 Qwen3.5-9B）
     payload = {
-        "model": "Qwen/Qwen3.5-9B",
+        "model": model_name,
         "messages": [
             {
                 "role": "system",
@@ -260,7 +261,7 @@ def _clean_output(text: str) -> str:
     
     return text
 
-def ai_knowledge_qa(user_question: str, api_key: str) -> str:
+def ai_knowledge_qa(user_question: str, api_key: str, model_name: str = "Qwen/Qwen3.5-9B") -> str:
     """
     业务概念与知识问答 - 直接调用大模型解答电商投流相关的概念和知识问题
     
@@ -303,8 +304,9 @@ def ai_knowledge_qa(user_question: str, api_key: str) -> str:
     }
     
     # 构建请求体
+    # 使用配置的模型名称（默认使用免费的 Qwen3.5-9B）
     payload = {
-        "model": "Qwen/Qwen3.5-9B",
+        "model": model_name,
         "messages": [
             {
                 "role": "system",

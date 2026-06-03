@@ -214,11 +214,13 @@ if "current_question" not in st.session_state:
 if "stop_requested" not in st.session_state:
     st.session_state.stop_requested = False
 
-# 从 Streamlit Secrets 读取 API Key（部署到 Streamlit Community Cloud 时使用）
+# 从 Streamlit Secrets 读取 API Key 和模型配置（部署到 Streamlit Community Cloud 时使用）
 try:
     API_KEY = st.secrets["SILICONFLOW_API_KEY"]
+    DEFAULT_MODEL = st.secrets.get("DEFAULT_MODEL", "Qwen/Qwen3.5-9B")
 except KeyError:
     API_KEY = ""
+    DEFAULT_MODEL = "Qwen/Qwen3.5-9B"
 
 # 检查 API Key 是否配置
 if not API_KEY:
@@ -233,6 +235,9 @@ if not API_KEY:
 
 if "api_key" not in st.session_state:
     st.session_state.api_key = API_KEY
+
+if "model_name" not in st.session_state:
+    st.session_state.model_name = DEFAULT_MODEL
 
 # 页面标题
 st.markdown('<h1 style="text-align: center; font-size: 2rem; font-weight: 700; color: #1e40af; margin-bottom: 0.5rem;">📊 电商数据智能分析平台</h1>', unsafe_allow_html=True)
@@ -452,7 +457,7 @@ if st.session_state.processing and len(st.session_state.messages) > 0:
     # ========== 意图路由阶段 ==========
     if last_msg.get("role") == "assistant" and last_msg.get("intent_route") == "processing":
         # 步骤 1: 意图路由 - 调用大模型进行精确分类
-        intent_category = route_intent(current_question, st.session_state.api_key)
+        intent_category = route_intent(current_question, st.session_state.api_key, st.session_state.model_name)
         last_msg["intent_route"] = "completed"
         last_msg["intent_category"] = intent_category
         
@@ -491,7 +496,7 @@ if st.session_state.processing and len(st.session_state.messages) > 0:
     elif last_msg.get("role") == "assistant" and last_msg.get("knowledge_qa_status") == "processing":
         # 直接调用大模型回答知识问题
         from data_analysis_agent import ai_knowledge_qa
-        answer = ai_knowledge_qa(current_question, st.session_state.api_key)
+        answer = ai_knowledge_qa(current_question, st.session_state.api_key, st.session_state.model_name)
         last_msg["knowledge_qa_status"] = "completed"
         last_msg["analysis"] = answer
         st.session_state.processing = False
@@ -500,7 +505,7 @@ if st.session_state.processing and len(st.session_state.messages) > 0:
     # ========== 数据查询分支 ==========
     elif last_msg.get("role") == "assistant" and last_msg.get("sql_status") == "processing":
         # 步骤 1: 生成 SQL
-        sql = text_to_sql(current_question, st.session_state.api_key)
+        sql = text_to_sql(current_question, st.session_state.api_key, st.session_state.model_name)
         
         if sql:
             last_msg["sql"] = sql
@@ -528,7 +533,7 @@ if st.session_state.processing and len(st.session_state.messages) > 0:
     
     elif last_msg.get("analysis_status") == "processing":
         # 步骤 3: AI 归因分析
-        analysis = ai_attribution_analysis(current_question, last_msg["sql"], last_msg["data"], st.session_state.api_key)
+        analysis = ai_attribution_analysis(current_question, last_msg["sql"], last_msg["data"], st.session_state.api_key, st.session_state.model_name)
         last_msg["analysis"] = analysis
         last_msg["analysis_status"] = "completed"
         st.session_state.processing = False

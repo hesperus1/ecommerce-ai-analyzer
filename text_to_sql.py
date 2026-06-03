@@ -153,7 +153,7 @@ INTENT_SQL_TEMPLATES = {
                        GROUP BY campaign_type"""
 }
 
-def _detect_intent(user_question: str, api_key: str) -> str:
+def _detect_intent(user_question: str, api_key: str, model_name: str = "Qwen/Qwen3.5-9B") -> str:
     """
     第一阶段：意图识别 - 让模型分析用户问题，识别业务意图
     
@@ -200,7 +200,7 @@ def _detect_intent(user_question: str, api_key: str) -> str:
     }
     
     payload = {
-        "model": "Qwen/Qwen3.5-9B",
+        "model": model_name,  # 使用配置的模型名称
         "messages": [
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": user_question}
@@ -338,7 +338,7 @@ def _generate_sql_from_intent(intent_id: str, params: dict) -> str:
     
     return sql
 
-def text_to_sql(user_question: str, api_key: str) -> str:
+def text_to_sql(user_question: str, api_key: str, model_name: str = "Qwen/Qwen3.5-9B") -> str:
     """
     将用户的自然语言问题转化为 SQLite 查询语句
     
@@ -368,7 +368,7 @@ def text_to_sql(user_question: str, api_key: str) -> str:
         return '[IRRELEVANT_QUERY]'
     
     # 第二阶段：意图识别
-    intent_id = _detect_intent(user_question, api_key)
+    intent_id = _detect_intent(user_question, api_key, model_name)
     
     # 如果意图识别失败，检查是否是因为问题太宽泛
     if not intent_id:

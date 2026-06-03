@@ -53,7 +53,7 @@ DATA_QUERY_KEYWORDS = [
     'ctr', 'cvr', '漏斗', '流失'
 ]
 
-def route_intent(user_question: str, api_key: str) -> str:
+def route_intent(user_question: str, api_key: str, model_name: str = "Qwen/Qwen3.5-9B") -> str:
     """
     意图路由 - 将用户问题分类到不同的处理分支
     
@@ -90,7 +90,7 @@ def route_intent(user_question: str, api_key: str) -> str:
     # 第三级：调用大模型进行精确意图分类
     return _classify_with_model(user_question, api_key)
 
-def _classify_with_model(user_question: str, api_key: str) -> str:
+def _classify_with_model(user_question: str, api_key: str, model_name: str = "Qwen/Qwen3.5-9B") -> str:
     """
     使用大模型进行精确意图分类
     
@@ -132,7 +132,7 @@ def _classify_with_model(user_question: str, api_key: str) -> str:
     }
     
     payload = {
-        "model": "Qwen/Qwen3.5-9B",
+        "model": model_name,  # 使用配置的模型名称
         "messages": [
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": user_question}
