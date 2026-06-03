@@ -200,7 +200,7 @@ def _detect_intent(user_question: str, api_key: str) -> str:
     }
     
     payload = {
-        "model": "deepseek-ai/DeepSeek-R1-0528-Qwen3-8B",
+        "model": "Qwen/Qwen3.5-9B",
         "messages": [
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": user_question}
